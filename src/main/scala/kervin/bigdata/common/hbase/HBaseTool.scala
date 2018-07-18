@@ -2,23 +2,108 @@ package kervin.bigdata.common.hbase
 
 import kervin.bigdata.common.Logging
 import kervin.bigdata.common.use
-import org.apache.hadoop.hbase.client.{Admin, Connection, ConnectionFactory, Table}
-import org.apache.hadoop.hbase.TableName
+import org.apache.commons.lang3.ArrayUtils
+import org.apache.hadoop.hbase.client.{Result, _}
+import org.apache.hadoop.hbase.filter.Filter
+import org.apache.hadoop.hbase.{Cell, TableName}
+import org.apache.hadoop.hbase.util.Bytes
 
-class HBaseTool extends AutoCloseable with Logging {
-  private val connection: Connection = {
-    ConnectionFactory.createConnection()
+import scala.collection.JavaConverters._
+import scala.language.implicitConversions
+
+trait HBaseTool {
+
+  @inline implicit def name2Table(name: String): TableName = TableName.valueOf(name)
+
+  @inline implicit def str2Bytes(str: String): Array[Byte] = Bytes.toBytes(str)
+
+  implicit case class RichConnection(connection: Connection) extends AutoCloseable{
+    self =>
+    def toRich: RichConnection = self
+
+    def useTable[T](name: String)(op: Table => T): T = {
+      use(connection.getTable(name))(op)
+    }
+
+    def useTables[T](names: String*)(op: Seq[Table] => T): T = {
+      val tables = names.map(x => connection.getTable(x))
+      try op(tables)
+      finally tables.foreach(_.close())
+    }
+
+    def useAdmin[T](op: Admin => T): T = {
+      use(connection.getAdmin)(op)
+    }
+
+    override def close(): Unit = self.close()
   }
 
-  override def close(): Unit = ???
-
-  implicit def name2Table(name: String) = TableName.valueOf(name)
-
-  def useTable[T](name: String)(op: Table => T): T = {
-    use(connection.getTable(name))(op)
+  implicit class RichResult(res: Result) {
+    def toMap: Map[String, Map[String, String]] = {
+      res.getNoVersionMap.asScala.map {
+        case (k, v) =>
+          Bytes.toString(k) -> v.asScala.map {
+            case (k2, v2) =>
+              Bytes.toString(k2) -> Bytes.toString(v2)
+          }.toMap
+      }
+    }.toMap
   }
 
-  def useAdmin[T](op: Admin => T): T = {
-    use(connection.getAdmin)(op)
+  implicit class RichCell(cell: Cell) {
+    @inline def value: Array[Byte] = ArrayUtils.subarray(cell.getValueArray, cell.getValueOffset, cell.getValueLength)
+
+    @inline def qualifier: String = Bytes.toString(ArrayUtils.subarray(cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength))
+
+    @inline def family: String = Bytes.toString(ArrayUtils.subarray(cell.getFamilyArray, cell.getFamilyOffset, cell.getFamilyLength))
   }
+
+  implicit class RichTable(table: Table) {
+    def get(rowKey: String): Result = {
+      get(rowKey, Map.empty, 1)
+    }
+
+    def get(rowKey: String, columns: Map[String, List[String]], version: Int): Result = {
+      get(str2Bytes(rowKey), columns, version)
+    }
+
+    def get(rowKey: Array[Byte], columns: Map[String, List[String]], version: Int): Result = {
+      val gt = new Get(rowKey)
+        .setMaxVersions(version)
+      columns.foreach {
+        case (f, cs) =>
+          gt.addFamily(f)
+          cs.foreach { c => gt.addColumn(f, c) }
+      }
+      table.get(gt)
+    }
+
+    def scan(start: String, stop: String): Iterable[Result] = {
+      scan(str2Bytes(start), str2Bytes(stop), 1)
+    }
+
+    def scan(start: String, stop: String, version: Int): Iterable[Result] = {
+      scan(str2Bytes(start), str2Bytes(stop), version)
+    }
+
+    def scan(start: Array[Byte], stop: Array[Byte], version: Int): Iterable[Result] = {
+      scan(start, stop, null, version)
+    }
+
+    def scan(start: Array[Byte], stop: Array[Byte], filter: Filter, version: Int): Iterable[Result] = {
+      //val cpm = Bytes.compareTo(start, stop)
+      val scn =
+        new Scan()
+          .setFilter(filter)
+          .setStartRow(start)
+          .setStopRow(stop)
+          .setMaxVersions(version)
+      table.getScanner(scn).asScala
+    }
+
+    def put(puts: Seq[Put]): Unit = {
+      table.put(puts.asJava)
+    }
+  }
+
 }
