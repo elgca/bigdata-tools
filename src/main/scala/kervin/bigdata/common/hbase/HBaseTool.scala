@@ -1,12 +1,12 @@
 package kervin.bigdata.common.hbase
 
-import kervin.bigdata.common.Logging
 import kervin.bigdata.common.use
 import org.apache.commons.lang3.ArrayUtils
 import org.apache.hadoop.hbase.client.{Result, _}
 import org.apache.hadoop.hbase.filter.Filter
-import org.apache.hadoop.hbase.{Cell, TableName}
 import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.util.RegionSplitter.HexStringSplit
+import org.apache.hadoop.hbase.{Cell, TableName}
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
@@ -17,7 +17,7 @@ trait HBaseTool {
 
   @inline implicit def str2Bytes(str: String): Array[Byte] = Bytes.toBytes(str)
 
-  implicit case class RichConnection(connection: Connection) extends AutoCloseable{
+  implicit class RichConnection(val connection: Connection) extends AutoCloseable {
     self =>
     def toRich: RichConnection = self
 
@@ -51,16 +51,16 @@ trait HBaseTool {
   }
 
   implicit class RichCell(cell: Cell) {
-    @inline def value: Array[Byte] = ArrayUtils.subarray(cell.getValueArray, cell.getValueOffset, cell.getValueLength)
+    @inline def value: Array[Byte] = ArrayUtils.subarray(cell.getRowArray, cell.getValueOffset, cell.getValueLength)
 
-    @inline def qualifier: String = Bytes.toString(ArrayUtils.subarray(cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength))
+    @inline def qualifier: String = Bytes.toString(ArrayUtils.subarray(cell.getRowArray, cell.getQualifierOffset, cell.getQualifierLength))
 
-    @inline def family: String = Bytes.toString(ArrayUtils.subarray(cell.getFamilyArray, cell.getFamilyOffset, cell.getFamilyLength))
+    @inline def family: String = Bytes.toString(ArrayUtils.subarray(cell.getRowArray, cell.getFamilyOffset, cell.getFamilyLength))
   }
 
   implicit class RichTable(table: Table) {
     def get(rowKey: String): Result = {
-      get(rowKey, Map.empty, 1)
+      get(rowKey, Map.empty[String, List[String]], 1)
     }
 
     def get(rowKey: String, columns: Map[String, List[String]], version: Int): Result = {
@@ -79,18 +79,18 @@ trait HBaseTool {
     }
 
     def scan(start: String, stop: String): Iterable[Result] = {
-      scan(str2Bytes(start), str2Bytes(stop), 1)
+      scan(start, stop, Map.empty[String, List[String]], 1)
     }
 
-    def scan(start: String, stop: String, version: Int): Iterable[Result] = {
-      scan(str2Bytes(start), str2Bytes(stop), version)
+    def scan(start: String, stop: String, columns: Map[String, List[String]], version: Int): Iterable[Result] = {
+      scan(str2Bytes(start), str2Bytes(stop), columns, version)
     }
 
-    def scan(start: Array[Byte], stop: Array[Byte], version: Int): Iterable[Result] = {
-      scan(start, stop, null, version)
+    def scan(start: Array[Byte], stop: Array[Byte], columns: Map[String, List[String]], version: Int): Iterable[Result] = {
+      scan(start, stop, columns, null, version)
     }
 
-    def scan(start: Array[Byte], stop: Array[Byte], filter: Filter, version: Int): Iterable[Result] = {
+    def scan(start: Array[Byte], stop: Array[Byte], columns: Map[String, List[String]], filter: Filter, version: Int): Iterable[Result] = {
       //val cpm = Bytes.compareTo(start, stop)
       val scn =
         new Scan()
@@ -98,6 +98,11 @@ trait HBaseTool {
           .setStartRow(start)
           .setStopRow(stop)
           .setMaxVersions(version)
+      columns.foreach {
+        case (f, cs) =>
+          scn.addFamily(f)
+          cs.foreach { c => scn.addColumn(f, c) }
+      }
       table.getScanner(scn).asScala
     }
 
@@ -105,5 +110,4 @@ trait HBaseTool {
       table.put(puts.asJava)
     }
   }
-
 }
