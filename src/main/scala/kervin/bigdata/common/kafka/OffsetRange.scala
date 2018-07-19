@@ -1,7 +1,6 @@
 package kervin.bigdata.common.kafka
 
 import org.apache.kafka.common.TopicPartition
-import org.apache.spark.streaming.kafka010.{OffsetRange => KOffsetRange}
 import org.joda.time.DateTime
 
 case class OffsetRange(line: ConsumerRecord,
@@ -34,10 +33,10 @@ case class OffsetRange(line: ConsumerRecord,
   }
 
   /** this is to avoid ClassNotFoundException during checkpoint restore */
-  def toTuple: OffsetRangeTuple = (line, topic, partition, fromOffset, untilOffset)
+  def toTuple: OffsetRangeTuple = (topic, partition, fromOffset, untilOffset)
 
-  def toOffsetRange: KOffsetRange =
-    KOffsetRange(topic, partition, fromOffset, untilOffset)
+  //  def toOffsetRange: KOffsetRange =
+  //    KOffsetRange(topic, partition, fromOffset, untilOffset)
 }
 
 object OffsetRange {
@@ -54,14 +53,14 @@ object OffsetRange {
     new OffsetRange(record, topicPartition.topic, topicPartition.partition, fromOffset, untilOffset)
 
   /** this is to avoid ClassNotFoundException during checkpoint restore */
-  type OffsetRangeTuple = (ConsumerRecord, String, Int, Long, Long)
+  type OffsetRangeTuple = (String, Int, Long, Long)
 
-  def fromOffsetRange(record: ConsumerRecord, offsetRange: KOffsetRange): OffsetRange = {
-    OffsetRange(record, offsetRange.topic, offsetRange.partition, offsetRange.fromOffset, offsetRange.untilOffset)
-  }
+  //  def fromOffsetRange(record: ConsumerRecord, offsetRange: OffsetRangeTuple): OffsetRange = {
+  //    OffsetRange(record, offsetRange.topic, offsetRange.partition, offsetRange.fromOffset, offsetRange.untilOffset)
+  //  }
 
-  def apply(t: OffsetRangeTuple) =
-    new OffsetRange(t._1, t._2, t._3, t._4, t._5)
+  def apply(record: ConsumerRecord, t: OffsetRangeTuple) =
+    new OffsetRange(record, t._1, t._2, t._3, t._4)
 }
 
 case class ConsumerRecord(consumer: String, time: DateTime = null)

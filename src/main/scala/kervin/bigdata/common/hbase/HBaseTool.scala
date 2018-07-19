@@ -5,13 +5,12 @@ import org.apache.commons.lang3.ArrayUtils
 import org.apache.hadoop.hbase.client.{Result, _}
 import org.apache.hadoop.hbase.filter.Filter
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.util.RegionSplitter.HexStringSplit
 import org.apache.hadoop.hbase.{Cell, TableName}
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 
-trait HBaseTool {
+object HBaseTool {
 
   @inline implicit def name2Table(name: String): TableName = TableName.valueOf(name)
 

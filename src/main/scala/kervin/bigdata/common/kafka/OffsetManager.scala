@@ -1,6 +1,5 @@
 package kervin.bigdata.common.kafka
 
-import org.apache.spark.streaming.kafka010
 import sorm.{Entity, InitMode, Instance}
 
 case class OffsetManager(
@@ -24,21 +23,21 @@ case class OffsetManager(
   ) {
   database =>
 
-  def selectOffset(c: String): List[kafka010.OffsetRange] = {
+  def selectOffset(c: String): List[OffsetRange.OffsetRangeTuple] = {
     database.query[ConsumerRecord].whereEqual("consumer", c).order("id", true).fetchOne().map {
       line =>
         database.query[OffsetRange].whereEqual("line", line)
-          .fetch().map(_.toOffsetRange).toList
+          .fetch().map(_.toTuple).toList
     }.getOrElse(Nil)
   }
 
-  def updateOffsets(c: String, offsets: Seq[kafka010.OffsetRange]): Unit = {
+  def updateOffsets(c: String, offsets: Seq[OffsetRange.OffsetRangeTuple]): Unit = {
     if (offsets == null || offsets.isEmpty) return
     database.transaction {
       val record = database.save(ConsumerRecord(c))
       offsets.foreach {
         x =>
-          database.save(OffsetRange.fromOffsetRange(record, x))
+          database.save(OffsetRange(record, x))
       }
     }
   }
