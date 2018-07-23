@@ -10,13 +10,13 @@ import org.apache.hadoop.hbase.{Cell, TableName}
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 
-object HBaseTool {
+trait HBaseTool extends Serializable {
 
   @inline implicit def name2Table(name: String): TableName = TableName.valueOf(name)
 
   @inline implicit def str2Bytes(str: String): Array[Byte] = Bytes.toBytes(str)
 
-  implicit class RichConnection(val connection: Connection) extends AutoCloseable {
+  implicit class RichConnection(val connection: Connection) {
     self =>
     def toRich: RichConnection = self
 
@@ -34,7 +34,6 @@ object HBaseTool {
       use(connection.getAdmin)(op)
     }
 
-    override def close(): Unit = self.close()
   }
 
   implicit class RichResult(res: Result) {
@@ -109,4 +108,5 @@ object HBaseTool {
       table.put(puts.asJava)
     }
   }
+
 }

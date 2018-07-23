@@ -5,12 +5,15 @@ import kervin.bigdata.common.json.JsonTools
 
 import scala.language.implicitConversions
 
+/**
+  * json support for ZKClient
+  */
 trait JsonZookeeperClient {
 
   implicit class JsonZkClient(zkClient: ZkClient) {
-    @inline private implicit def str2Bytes(str: String) = str.getBytes("utf-8")
+    @inline private implicit def str2Bytes(str: String): Array[Byte] = str.getBytes("utf-8")
 
-    @inline private implicit def bytes2Str(arr: Array[Byte]) = new String(arr)
+    @inline private implicit def bytes2Str(arr: Array[Byte]): String = new String(arr)
 
     def writeJson[T <: AnyRef](path: String, obj: T): Unit = {
       val json = JsonTools.write(obj)

@@ -44,7 +44,7 @@ object OffsetRange {
              topicPartition: TopicPartition,
              fromOffset: Long,
              untilOffset: Long): OffsetRange =
-    new OffsetRange(record, topicPartition.topic, topicPartition.partition, fromOffset, untilOffset)
+    new OffsetRange(record, topicPartition.topic(), topicPartition.partition(), fromOffset, untilOffset)
 
   def apply(record: ConsumerRecord,
             topicPartition: TopicPartition,
@@ -54,13 +54,16 @@ object OffsetRange {
 
   /** this is to avoid ClassNotFoundException during checkpoint restore */
   type OffsetRangeTuple = (String, Int, Long, Long)
-
+  //  type TopicPartition = (String, Int)
   //  def fromOffsetRange(record: ConsumerRecord, offsetRange: OffsetRangeTuple): OffsetRange = {
   //    OffsetRange(record, offsetRange.topic, offsetRange.partition, offsetRange.fromOffset, offsetRange.untilOffset)
   //  }
 
   def apply(record: ConsumerRecord, t: OffsetRangeTuple) =
     new OffsetRange(record, t._1, t._2, t._3, t._4)
+
+  val latest: Long = -2
+  val earliest: Long = -1
 }
 
-case class ConsumerRecord(consumer: String, time: DateTime = null)
+case class ConsumerRecord(consumer: String, topics: Seq[String], time: DateTime = null)
