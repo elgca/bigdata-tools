@@ -14,7 +14,10 @@ import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010._
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.joda.time.DateTime
-
+/**
+* 以Kafka作为数据源的spark streaming类，可选择由kafka本身管理offset或则
+* 由mysql管理offset；并提供邮件通知功能
+*/
 trait SparkKafkaStreamingRunner extends Serializable with Logging {
   @transient var emailSender: EMailSender = _
 
